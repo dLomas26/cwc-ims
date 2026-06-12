@@ -13,6 +13,7 @@ import { PageLoader } from '../../../components/ui/Loader'
 import EmptyState from '../../../components/ui/EmptyState'
 import Tabs from '../../../components/ui/Tabs'
 import Pagination from '../../../components/ui/Pagination'
+import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import { useToast } from '../../../store/ToastContext'
 import { formatDate, formatDateTime } from '../../../utils/formatters'
 import useDisclosure from '../../../hooks/useDisclosure'
@@ -82,6 +83,7 @@ const ConsumableDetailDrawer = ({ isOpen, onClose, consumable, onUpdated }) => {
   const toast = useToast()
   const [activeTab, setActiveTab] = useState('overview')
   const [stockModal, setStockModal] = useState(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [txPage, setTxPage] = useState(1)
 
   const { data: txData, isLoading: txLoading } = useQuery({
@@ -92,7 +94,12 @@ const ConsumableDetailDrawer = ({ isOpen, onClose, consumable, onUpdated }) => {
 
   const deleteMutation = useMutation({
     mutationFn: () => consumableApi.delete(consumable.id),
-    onSuccess: () => { toast.success('Consumable deleted'); queryClient.invalidateQueries({ queryKey: ['consumables'] }); onClose() },
+    onSuccess: () => { 
+      toast.success('Consumable deleted')
+      queryClient.invalidateQueries({ queryKey: ['consumables'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      onClose() 
+    },
     onError: (err) => toast.error(err.response?.data?.message || 'Delete failed'),
   })
 
@@ -100,8 +107,21 @@ const ConsumableDetailDrawer = ({ isOpen, onClose, consumable, onUpdated }) => {
   const available = Math.max(0, consumable.current_stock - consumable.damaged_quantity)
 
   return (
-    <Drawer isOpen={isOpen} onClose={onClose} title={consumable.name} width="max-w-lg">
-      {/* Stock Summary */}
+    <>
+      <Drawer 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        title={consumable.name} 
+        width="max-w-lg"
+        footer={
+          <div className="flex justify-start w-full">
+            <Button variant="danger-ghost" size="sm" onClick={() => setDeleteOpen(true)}>
+              Delete Consumable
+            </Button>
+          </div>
+        }
+      >
+        {/* Stock Summary */}
       <div className="grid grid-cols-4 gap-2 mb-5">
         {[
           { label: 'In Stock', value: consumable.current_stock, color: 'text-slate-800' },
@@ -185,6 +205,18 @@ const ConsumableDetailDrawer = ({ isOpen, onClose, consumable, onUpdated }) => {
         />
       )}
     </Drawer>
+
+      <ConfirmDialog
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        loading={deleteMutation.isPending}
+        title="Delete Consumable?"
+        message={`This will permanently delete "${consumable.name}" and all its stock history. This action cannot be undone.`}
+        confirmLabel="Delete Permanently"
+        confirmVariant="danger"
+      />
+    </>
   )
 }
 

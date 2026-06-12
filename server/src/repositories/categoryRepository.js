@@ -131,6 +131,25 @@ const getFields = async (categoryId) => {
 };
 
 /**
+ * Find a single field by its own id, optionally scoped to a category
+ * @param {number|string} fieldId
+ * @param {number|string} [categoryId]
+ * @returns {Object|null}
+ */
+const findFieldById = async (fieldId, categoryId) => {
+  let sql, params;
+  if (categoryId !== undefined) {
+    sql = 'SELECT * FROM category_fields WHERE id = $1 AND category_id = $2';
+    params = [fieldId, categoryId];
+  } else {
+    sql = 'SELECT * FROM category_fields WHERE id = $1';
+    params = [fieldId];
+  }
+  const result = await query(sql, params);
+  return result.rows[0] || null;
+};
+
+/**
  * Add a new custom field to a category
  * @param {string} categoryId
  * @param {Object} data
@@ -218,6 +237,7 @@ module.exports = {
   update,
   deleteCategory,
   getFields,
+  findFieldById,
   addField,
   updateField,
   deleteField,

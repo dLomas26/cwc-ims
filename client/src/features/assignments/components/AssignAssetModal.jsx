@@ -127,6 +127,9 @@ const AssignAssetModal = ({ isOpen, onClose }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assignments'] })
       queryClient.invalidateQueries({ queryKey: ['assets'] })
+      queryClient.invalidateQueries({ queryKey: ['asset'] })
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.invalidateQueries({ queryKey: ['employee'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       reset()
       onClose()

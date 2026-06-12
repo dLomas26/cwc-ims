@@ -38,11 +38,7 @@ const CategoryCard = ({ category, onEdit, onDelete, onManageFields }) => (
     <h3 className="font-semibold text-slate-800 mb-1">{category.name}</h3>
     {category.description && <p className="text-sm text-slate-500 mb-3 line-clamp-2">{category.description}</p>}
 
-    <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-      <div className="flex gap-3 text-xs text-slate-400">
-        <span><strong className="text-slate-600">{category.field_count || 0}</strong> fields</span>
-        <span><strong className="text-slate-600">{category.asset_count || 0}</strong> assets</span>
-      </div>
+    <div className="flex items-center justify-end mt-3 pt-3 border-t border-slate-100">
       <Button variant="secondary" size="xs" onClick={() => onManageFields(category)}>
         Manage Fields →
       </Button>

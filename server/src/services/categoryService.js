@@ -117,16 +117,10 @@ const addField = async (categoryId, data) => {
  * @returns {Object}
  */
 const updateField = async (categoryId, fieldId, data) => {
-  // Verify both category and field exist
-  const category = await categoryRepository.findById(categoryId);
-  if (!category) {
-    throw ApiError.notFound(`Category with ID ${categoryId} not found`);
-  }
-
-  const fields = await categoryRepository.getFields(categoryId);
-  const field = fields.find((f) => f.id === fieldId);
+  // Verify field exists (field id is a global unique SERIAL primary key)
+  const field = await categoryRepository.findFieldById(fieldId);
   if (!field) {
-    throw ApiError.notFound(`Field with ID ${fieldId} not found in this category`);
+    throw ApiError.notFound(`Field with ID ${fieldId} not found`);
   }
 
   return categoryRepository.updateField(fieldId, data);
@@ -138,15 +132,10 @@ const updateField = async (categoryId, fieldId, data) => {
  * @param {string} fieldId
  */
 const deleteField = async (categoryId, fieldId) => {
-  const category = await categoryRepository.findById(categoryId);
-  if (!category) {
-    throw ApiError.notFound(`Category with ID ${categoryId} not found`);
-  }
-
-  const fields = await categoryRepository.getFields(categoryId);
-  const field = fields.find((f) => f.id === fieldId);
+  // Verify field exists (field id is a global unique SERIAL primary key)
+  const field = await categoryRepository.findFieldById(fieldId);
   if (!field) {
-    throw ApiError.notFound(`Field with ID ${fieldId} not found in this category`);
+    throw ApiError.notFound(`Field with ID ${fieldId} not found`);
   }
 
   await categoryRepository.deleteField(fieldId);
