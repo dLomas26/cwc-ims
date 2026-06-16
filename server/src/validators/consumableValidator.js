@@ -37,6 +37,8 @@ const issueConsumableSchema = z.object({
     .int('Quantity must be a whole number')
     .min(1, 'Quantity must be at least 1'),
   is_returnable: z.boolean({ required_error: 'is_returnable is required' }),
+  // Optional back-dated issue timestamp; defaults to NOW() if omitted
+  assigned_at: z.string().optional(),
   remarks: z.string().optional(),
 });
 

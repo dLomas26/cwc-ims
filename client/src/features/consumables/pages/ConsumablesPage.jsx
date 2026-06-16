@@ -9,6 +9,7 @@ import Drawer from '../../../components/ui/Drawer'
 import Input from '../../../components/ui/Input'
 import Textarea from '../../../components/ui/Textarea'
 import SearchInput from '../../../components/ui/SearchInput'
+import SearchableSelect from '../../../components/ui/SearchableSelect'
 import Badge from '../../../components/ui/Badge'
 import EmptyState from '../../../components/ui/EmptyState'
 import Tabs from '../../../components/ui/Tabs'
@@ -84,18 +85,27 @@ const StockModal = ({ isOpen, onClose, type, consumable, onSuccess }) => {
 const IssueModal = ({ isOpen, onClose, consumable, onSuccess }) => {
   const toast = useToast()
   const [employeeId, setEmployeeId] = useState('')
+  const [empSearch, setEmpSearch] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [issueType, setIssueType] = useState('returnable') // 'returnable' | 'consumed'
+  const [assignedAt, setAssignedAt] = useState('')
   const [remarks, setRemarks] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const { data: employees } = useQuery({
-    queryKey: ['employees-active'],
-    queryFn: () => employeeApi.getAll({ is_archived: false, limit: 200 }).then(r => r.data.data),
+  const { data: employees, isLoading: empsLoading } = useQuery({
+    queryKey: ['employees-active', empSearch],
+    queryFn: () => employeeApi.getAll({ is_archived: false, search: empSearch, limit: 100 }).then(r => r.data.data),
     enabled: isOpen,
+    keepPreviousData: true,
   })
 
-  const reset = () => { setEmployeeId(''); setQuantity(1); setIssueType('returnable'); setRemarks('') }
+  const employeeOptions = (employees || []).map(e => ({
+    value: String(e.id),
+    label: e.name,
+    sublabel: [e.employee_code, e.division].filter(Boolean).join(' · '),
+  }))
+
+  const reset = () => { setEmployeeId(''); setQuantity(1); setIssueType('returnable'); setAssignedAt(''); setRemarks('') }
   const close = () => { reset(); onClose() }
 
   const available = consumable
@@ -114,6 +124,7 @@ const IssueModal = ({ isOpen, onClose, consumable, onSuccess }) => {
         employee_id: employeeId,
         quantity: Number(quantity),
         is_returnable: issueType === 'returnable',
+        assigned_at: assignedAt || undefined,
         remarks: remarks || undefined,
       })
       toast.success(issueType === 'returnable'
@@ -141,13 +152,16 @@ const IssueModal = ({ isOpen, onClose, consumable, onSuccess }) => {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">Employee <span className="text-red-500">*</span></label>
-          <select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className={inputCls}>
-            <option value="">Select employee...</option>
-            {(employees || []).map(e => <option key={e.id} value={e.id}>{e.name}{e.employee_code ? ` (${e.employee_code})` : ''}</option>)}
-          </select>
-        </div>
+        <SearchableSelect
+          label="Employee"
+          required
+          placeholder="Select employee..."
+          options={employeeOptions}
+          value={employeeId}
+          onChange={setEmployeeId}
+          onSearchChange={setEmpSearch}
+          loading={empsLoading}
+        />
 
         <Input
           label="Quantity"
@@ -187,6 +201,11 @@ const IssueModal = ({ isOpen, onClose, consumable, onSuccess }) => {
               </label>
             ))}
           </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">Issue Date <span className="text-slate-400 text-xs">(defaults to today)</span></label>
+          <input type="date" value={assignedAt} onChange={e => setAssignedAt(e.target.value)} className={inputCls} />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -603,7 +622,7 @@ const IssuancesTab = () => {
     },
     { key: 'quantity', header: 'Qty', render: (v, r) => <span className="font-medium">{v} {r.consumable_unit || 'units'}</span> },
     { key: 'assigned_at', header: 'Issued On', render: v => formatDate(v) },
-    { key: 'days_active', header: 'Days Active', render: (_, r) => <span className="font-medium">{getDaysActive(r.assigned_at)}d</span> },
+    // { key: 'days_active', header: 'Days Active', render: (_, r) => <span className="font-medium">{getDaysActive(r.assigned_at)}d</span> },
     {
       key: 'actions', header: '', width: '90px',
       render: (_, row) => <Button variant="secondary" size="xs" onClick={() => setReturnAssignment(row)}>Return</Button>,

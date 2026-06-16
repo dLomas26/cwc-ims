@@ -37,4 +37,12 @@ router.patch(
   assignmentController.returnAsset
 );
 
+// DELETE /api/assignments/:id — permanently delete a returned assignment record
+router.delete(
+  '/:id',
+  authenticateJWT,
+  requireAdmin,
+  assignmentController.deleteAssignment
+);
+
 module.exports = router;

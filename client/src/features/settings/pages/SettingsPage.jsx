@@ -6,6 +6,7 @@ import Button from '../../../components/ui/Button'
 import DataTable from '../../../components/ui/DataTable'
 import Badge from '../../../components/ui/Badge'
 import Modal from '../../../components/ui/Modal'
+import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Card from '../../../components/ui/Card'
@@ -36,7 +37,9 @@ const SettingsPage = () => {
   const { user: currentUser, isSuperAdmin } = useAuth()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState('users')
+  const [userToDelete, setUserToDelete] = useState(null)
   const createModal = useDisclosure()
+  const deleteDialog = useDisclosure()
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
@@ -60,6 +63,22 @@ const SettingsPage = () => {
     onSuccess: () => { toast.success('Role updated'); queryClient.invalidateQueries({ queryKey: ['users'] }) },
     onError: (err) => toast.error(err.response?.data?.message || 'Failed to update role'),
   })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => userApi.delete(id),
+    onSuccess: () => {
+      toast.success('User deleted')
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      deleteDialog.close()
+      setUserToDelete(null)
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to delete user'),
+  })
+
+  const handleDeleteClick = (user) => {
+    setUserToDelete(user)
+    deleteDialog.open()
+  }
 
   const columns = [
     {
@@ -92,6 +111,23 @@ const SettingsPage = () => {
       }
     },
     { key: 'created_at', header: 'Created', render: v => <span className="text-xs text-slate-400">{formatDateTime(v)}</span> },
+    {
+      key: 'delete', header: '', width: '60px',
+      render: (_, r) => {
+        if (r.id === currentUser?.id) return null
+        return (
+          <button
+            onClick={() => handleDeleteClick(r)}
+            title="Delete user"
+            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+            </svg>
+          </button>
+        )
+      }
+    },
   ]
 
   return (
@@ -186,6 +222,17 @@ const SettingsPage = () => {
           <Select label="Role" required options={ROLE_OPTIONS} {...register('role')} />
         </form>
       </Modal>
+
+      {/* Delete User Confirmation */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => { deleteDialog.close(); setUserToDelete(null) }}
+        onConfirm={() => userToDelete && deleteMutation.mutate(userToDelete.id)}
+        title="Delete user?"
+        message={userToDelete ? `This will permanently remove ${userToDelete.full_name || userToDelete.email}. They will lose access immediately. This action cannot be undone.` : ''}
+        confirmLabel="Delete"
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }

@@ -93,4 +93,14 @@ const updateUser = async (id, data) => {
   return result.rows[0] || null;
 };
 
-module.exports = { findAll, findById, create, updateRole, updateUser };
+/**
+ * Delete a user permanently
+ * @param {string} id
+ * @returns {boolean}
+ */
+const deleteUser = async (id) => {
+  const result = await query(`DELETE FROM users WHERE id = $1`, [id]);
+  return result.rowCount > 0;
+};
+
+module.exports = { findAll, findById, create, updateRole, updateUser, deleteUser };

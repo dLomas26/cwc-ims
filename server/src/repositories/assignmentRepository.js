@@ -111,12 +111,12 @@ const findActiveByAssetId = async (asset_id) => {
  * @param {Object} data
  * @returns {Object}
  */
-const create = async ({ employee_id, asset_id, remarks, assigned_by }) => {
+const create = async ({ employee_id, asset_id, remarks, assigned_at, assigned_by }) => {
   const result = await query(
     `INSERT INTO assignments (employee_id, asset_id, remarks, assigned_by, is_active, assigned_at)
-     VALUES ($1, $2, $3, $4, true, NOW())
+     VALUES ($1, $2, $3, $4, true, COALESCE($5::timestamptz, NOW()))
      RETURNING *`,
-    [employee_id, asset_id, remarks || null, assigned_by]
+    [employee_id, asset_id, remarks || null, assigned_by, assigned_at || null]
   );
   return result.rows[0];
 };
@@ -206,4 +206,14 @@ const getHistory = async ({ search, employee_id, category_id, limit, offset }) =
   return { rows, total };
 };
 
-module.exports = { findAll, findById, findActiveByAssetId, create, returnAssignment, getHistory };
+/**
+ * Delete an assignment record permanently
+ * @param {string} id - assignment UUID
+ * @returns {boolean}
+ */
+const deleteAssignment = async (id) => {
+  const result = await query(`DELETE FROM assignments WHERE id = $1`, [id]);
+  return result.rowCount > 0;
+};
+
+module.exports = { findAll, findById, findActiveByAssetId, create, returnAssignment, getHistory, deleteAssignment };

@@ -43,7 +43,7 @@ const getAll = async (queryParams) => {
  * @returns {Object} created assignment
  */
 const assign = async (data, userId) => {
-  const { employee_id, asset_id, serial_number, asset_number, remarks } = data;
+  const { employee_id, asset_id, serial_number, asset_number, assigned_at, remarks } = data;
 
   // 1. Verify employee exists and is not archived
   const employee = await employeeRepository.findById(employee_id);
@@ -84,6 +84,7 @@ const assign = async (data, userId) => {
     employee_id,
     asset_id,
     remarks,
+    assigned_at: assigned_at || null,
     assigned_by: userId,
   });
 
@@ -152,4 +153,25 @@ const getHistory = async (queryParams) => {
   };
 };
 
-module.exports = { getAll, assign, returnAsset, getHistory };
+/**
+ * Delete an assignment record permanently
+ * Only allowed for already-returned (inactive) assignments to prevent
+ * orphaning an asset's "assigned" status.
+ * @param {string} id
+ * @returns {boolean}
+ */
+const deleteAssignment = async (id) => {
+  const assignment = await assignmentRepository.findById(id);
+  if (!assignment) {
+    throw ApiError.notFound(`Assignment with ID ${id} not found`);
+  }
+  if (assignment.is_active) {
+    throw ApiError.conflict(
+      'Cannot delete an active assignment. Return the asset first.'
+    );
+  }
+  await assignmentRepository.deleteAssignment(id);
+  return true;
+};
+
+module.exports = { getAll, assign, returnAsset, getHistory, deleteAssignment };

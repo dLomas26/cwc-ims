@@ -186,7 +186,7 @@ const getAllAssignments = async (queryParams) => {
  * Caller chooses returnable (tracked, must be returned) or
  * consumed-on-issue (stock simply leaves the store).
  */
-const issue = async (id, { employee_id, quantity, is_returnable, remarks }, userId) => {
+const issue = async (id, { employee_id, quantity, is_returnable, assigned_at, remarks }, userId) => {
   const existing = await consumableRepository.findById(id);
   if (!existing) {
     throw ApiError.notFound(`Item with ID ${id} not found`);
@@ -222,6 +222,7 @@ const issue = async (id, { employee_id, quantity, is_returnable, remarks }, user
         quantity,
         is_returnable: true,
         remarks,
+        assigned_at: assigned_at || null,
         assigned_by: userId,
       }),
       consumableRepository.createTransaction({
@@ -247,6 +248,7 @@ const issue = async (id, { employee_id, quantity, is_returnable, remarks }, user
       quantity,
       is_returnable: false,
       remarks,
+      assigned_at: assigned_at || null,
       assigned_by: userId,
     }),
     consumableRepository.createTransaction({

@@ -9,28 +9,47 @@ import DataTable from '../../../components/ui/DataTable'
 import Pagination from '../../../components/ui/Pagination'
 import Badge from '../../../components/ui/Badge'
 import Modal from '../../../components/ui/Modal'
+import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import SearchInput from '../../../components/ui/SearchInput'
+import SearchableSelect from '../../../components/ui/SearchableSelect'
 import { useToast } from '../../../store/ToastContext'
+import { useAuth } from '../../../store/AuthContext'
 import { formatDate, getDaysActive } from '../../../utils/formatters'
 import useDisclosure from '../../../hooks/useDisclosure'
 
 // ─── Assign Modal ─────────────────────────────────────────────
 const AssignModal = ({ isOpen, onClose, onSuccess }) => {
   const toast = useToast()
-  const [form, setForm] = useState({ employee_id: '', asset_id: '', serial_number: '', asset_number: '', remarks: '' })
+  const [form, setForm] = useState({ employee_id: '', asset_id: '', serial_number: '', asset_number: '', assigned_at: '', remarks: '' })
   const [submitting, setSubmitting] = useState(false)
+  const [empSearch, setEmpSearch] = useState('')
+  const [assetSearch, setAssetSearch] = useState('')
 
-  const { data: employees } = useQuery({
-    queryKey: ['employees-active'],
-    queryFn: () => employeeApi.getAll({ is_archived: false, limit: 200 }).then(r => r.data.data),
+  const { data: employees, isLoading: empsLoading } = useQuery({
+    queryKey: ['employees-active', empSearch],
+    queryFn: () => employeeApi.getAll({ is_archived: false, search: empSearch, limit: 100 }).then(r => r.data.data),
     enabled: isOpen,
+    keepPreviousData: true,
   })
 
-  const { data: availableAssets } = useQuery({
-    queryKey: ['assets-available'],
-    queryFn: () => assetApi.getAll({ status: 'available', limit: 200 }).then(r => r.data.data),
+  const { data: availableAssets, isLoading: assetsLoading } = useQuery({
+    queryKey: ['assets-available', assetSearch],
+    queryFn: () => assetApi.getAll({ status: 'available', search: assetSearch, limit: 100 }).then(r => r.data.data),
     enabled: isOpen,
+    keepPreviousData: true,
   })
+
+  const employeeOptions = (employees || []).map(e => ({
+    value: String(e.id),
+    label: e.name,
+    sublabel: [e.employee_code, e.division].filter(Boolean).join(' · '),
+  }))
+
+  const assetOptions = (availableAssets || []).map(a => ({
+    value: String(a.id),
+    label: a.product_name || `Asset #${a.id}`,
+    sublabel: [a.category_name, a.model, a.serial_number].filter(Boolean).join(' · '),
+  }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -42,10 +61,11 @@ const AssignModal = ({ isOpen, onClose, onSuccess }) => {
         asset_id: form.asset_id,
         serial_number: form.serial_number || undefined,
         asset_number: form.asset_number || undefined,
+        assigned_at: form.assigned_at || undefined,
         remarks: form.remarks || undefined,
       })
       toast.success('Asset assigned successfully')
-      setForm({ employee_id: '', asset_id: '', serial_number: '', asset_number: '', remarks: '' })
+      setForm({ employee_id: '', asset_id: '', serial_number: '', asset_number: '', assigned_at: '', remarks: '' })
       onSuccess()
       onClose()
     } catch (err) {
@@ -67,21 +87,28 @@ const AssignModal = ({ isOpen, onClose, onSuccess }) => {
       }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">Employee <span className="text-red-500">*</span></label>
-          <select value={form.employee_id} onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))} className={inputCls}>
-            <option value="">Select employee...</option>
-            {(employees || []).map(e => <option key={e.id} value={e.id}>{e.name}{e.employee_code ? ` (${e.employee_code})` : ''}</option>)}
-          </select>
-        </div>
+        <SearchableSelect
+          label="Employee"
+          required
+          placeholder="Select employee..."
+          options={employeeOptions}
+          value={form.employee_id}
+          onChange={(v) => setForm(f => ({ ...f, employee_id: v }))}
+          onSearchChange={setEmpSearch}
+          loading={empsLoading}
+        />
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-slate-700">Asset <span className="text-red-500">*</span></label>
-          <select value={form.asset_id} onChange={e => setForm(f => ({ ...f, asset_id: e.target.value }))} className={inputCls}>
-            <option value="">Select available asset...</option>
-            {(availableAssets || []).map(a => <option key={a.id} value={a.id}>{a.product_name || a.category_name}{a.serial_number ? ` — ${a.serial_number}` : ''}</option>)}
-          </select>
-        </div>
+        <SearchableSelect
+          label="Asset"
+          required
+          placeholder="Select available asset..."
+          options={assetOptions}
+          value={form.asset_id}
+          onChange={(v) => setForm(f => ({ ...f, asset_id: v }))}
+          onSearchChange={setAssetSearch}
+          loading={assetsLoading}
+          emptyMessage="No available assets"
+        />
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
@@ -92,6 +119,11 @@ const AssignModal = ({ isOpen, onClose, onSuccess }) => {
             <label className="text-sm font-medium text-slate-700">Asset Number <span className="text-slate-400 text-xs">(optional)</span></label>
             <input value={form.asset_number} onChange={e => setForm(f => ({ ...f, asset_number: e.target.value }))} placeholder="Will update asset record" className={inputCls} />
           </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700">Assignment Date <span className="text-slate-400 text-xs">(defaults to today)</span></label>
+          <input type="date" value={form.assigned_at} onChange={e => setForm(f => ({ ...f, assigned_at: e.target.value }))} className={inputCls} />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -184,8 +216,11 @@ const ReturnModal = ({ isOpen, onClose, assignment, onSuccess }) => {
 // ─── Main Page ─────────────────────────────────────────────────
 const AssignmentsPage = () => {
   const queryClient = useQueryClient()
+  const toast = useToast()
+  const { isAdmin } = useAuth()
   const assignModal = useDisclosure()
   const returnModal = useDisclosure()
+  const deleteDialog = useDisclosure()
   const [activeTab, setActiveTab] = useState('active')
   const [selectedAssignment, setSelectedAssignment] = useState(null)
   const [search, setSearch] = useState('')
@@ -208,6 +243,23 @@ const AssignmentsPage = () => {
     returnModal.open()
   }
 
+  const handleDeleteClick = (assignment) => {
+    setSelectedAssignment(assignment)
+    deleteDialog.open()
+  }
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => assignmentApi.delete(id),
+    onSuccess: () => {
+      toast.success('Assignment record deleted')
+      queryClient.invalidateQueries({ queryKey: ['assignments-history'] })
+      queryClient.invalidateQueries({ queryKey: ['assignments-active'] })
+      deleteDialog.close()
+      setSelectedAssignment(null)
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to delete assignment'),
+  })
+
   const onMutationSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['assignments-active'] })
     queryClient.invalidateQueries({ queryKey: ['assignments-history'] })
@@ -224,7 +276,7 @@ const AssignmentsPage = () => {
     { key: 'employee_name', header: 'Employee', render: (v, r) => <div><p className="font-medium text-slate-800">{v}</p>{r.employee_code && <p className="text-xs text-slate-400">{r.employee_code}</p>}</div> },
     { key: 'product_name', header: 'Asset', render: (_, r) => <div><p className="font-medium text-slate-800">{r.product_name || r.category_name}</p>{r.serial_number && <p className="font-mono text-xs text-slate-500">{r.serial_number}</p>}</div> },
     { key: 'assigned_at', header: 'Assigned Date', render: (v) => formatDate(v) },
-    { key: 'days_active', header: 'Days Active', render: (_, row) => <span className="font-medium">{getDaysActive(row.assigned_at)}d</span> },
+    // { key: 'days_active', header: 'Days Active', render: (_, row) => <span className="font-medium">{getDaysActive(row.assigned_at)}d</span> },
     {
       key: 'actions', header: '', width: '80px',
       render: (_, row) => (
@@ -241,6 +293,20 @@ const AssignmentsPage = () => {
     { key: 'assigned_at', header: 'Assigned', render: (v) => formatDate(v) },
     { key: 'returned_at', header: 'Returned', render: (v) => v ? formatDate(v) : <span className="text-indigo-600 text-xs font-medium">Active</span> },
     { key: 'return_condition', header: 'Condition', render: (v) => v ? <Badge status={v} /> : '—' },
+    ...(isAdmin() ? [{
+      key: 'actions', header: '', width: '60px',
+      render: (_, row) => row.is_active ? null : (
+        <button
+          onClick={(e) => { e.stopPropagation(); handleDeleteClick(row) }}
+          title="Delete record"
+          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+          </svg>
+        </button>
+      )
+    }] : []),
   ]
 
   const activeItems = activeData?.data || []
@@ -287,6 +353,15 @@ const AssignmentsPage = () => {
 
       <AssignModal isOpen={assignModal.isOpen} onClose={assignModal.close} onSuccess={onMutationSuccess} />
       <ReturnModal isOpen={returnModal.isOpen} onClose={returnModal.close} assignment={selectedAssignment} onSuccess={onMutationSuccess} />
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => { deleteDialog.close(); setSelectedAssignment(null) }}
+        onConfirm={() => selectedAssignment && deleteMutation.mutate(selectedAssignment.id)}
+        title="Delete assignment record?"
+        message={selectedAssignment ? `This will permanently remove the history entry for ${selectedAssignment.product_name || selectedAssignment.category_name} assigned to ${selectedAssignment.employee_name}. This action cannot be undone.` : ''}
+        confirmLabel="Delete"
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }

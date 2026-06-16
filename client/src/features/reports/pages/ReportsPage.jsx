@@ -14,13 +14,13 @@ import { categoryApi } from '../../../api/categoryApi'
 
 const TABS = [
   { id: 'employees', label: 'Employee Assets' },
-  { id: 'categories', label: 'Category Breakdown' },
+  // { id: 'categories', label: 'Category Breakdown' },
   { id: 'asset-status', label: 'Asset Status' },
   { id: 'assignment-history', label: 'Assignment History' },
   { id: 'stock', label: 'Bulk Inventory Stock' },
   { id: 'damaged', label: 'Damaged Assets' },
 ]
-
+  
 // ─── Export Button ─────────────────────────────────────────────
 const ExportButton = ({ onClick, loading }) => (
   <Button

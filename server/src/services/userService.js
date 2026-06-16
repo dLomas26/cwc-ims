@@ -112,4 +112,35 @@ const setActiveStatus = async (id, is_active, requestingUser) => {
   return userRepository.updateUser(id, { is_active });
 };
 
-module.exports = { getAll, getById, updateRole, createUser, setActiveStatus };
+/**
+ * Delete a user account permanently
+ * Cannot delete self or the last super_admin
+ * @param {string} id
+ * @param {Object} requestingUser
+ * @returns {boolean}
+ */
+const deleteUser = async (id, requestingUser) => {
+  if (requestingUser.id === id) {
+    throw ApiError.forbidden('You cannot delete your own account');
+  }
+
+  const target = await userRepository.findById(id);
+  if (!target) {
+    throw ApiError.notFound(`User with ID ${id} not found`);
+  }
+
+  if (target.role === ROLES.SUPER_ADMIN) {
+    const allUsers = await userRepository.findAll();
+    const superAdminCount = allUsers.filter((u) => u.role === ROLES.SUPER_ADMIN).length;
+    if (superAdminCount <= 1) {
+      throw ApiError.conflict(
+        'Cannot delete the last super_admin. Promote another user to super_admin first.'
+      );
+    }
+  }
+
+  await userRepository.deleteUser(id);
+  return true;
+};
+
+module.exports = { getAll, getById, updateRole, createUser, setActiveStatus, deleteUser };

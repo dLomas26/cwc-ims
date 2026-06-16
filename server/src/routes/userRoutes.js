@@ -56,4 +56,12 @@ router.patch(
   userController.setActiveStatus
 );
 
+// DELETE /api/users/:id — permanently delete a user account
+router.delete(
+  '/:id',
+  authenticateJWT,
+  requireSuperAdmin,
+  userController.deleteUser
+);
+
 module.exports = router;

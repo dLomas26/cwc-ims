@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { assetApi } from '../../../api/assetApi'
+import { categoryApi } from '../../../api/categoryApi'
 import Drawer from '../../../components/ui/Drawer'
 import Tabs from '../../../components/ui/Tabs'
 import Badge from '../../../components/ui/Badge'
@@ -45,6 +46,13 @@ const AssetDetailDrawer = ({ asset, isOpen, onClose, onUpdated }) => {
   })
 
   const detail = assetDetail || asset
+
+  // Category field metadata — for labels + types when rendering custom values
+  const { data: categoryFields } = useQuery({
+    queryKey: ['category-fields', detail?.category_id],
+    queryFn: () => categoryApi.getFields(detail.category_id).then(r => r.data.data),
+    enabled: isOpen && !!detail?.category_id,
+  })
 
   const updateMutation = useMutation({
     mutationFn: (data) => assetApi.update(detail.id, data),
@@ -91,13 +99,32 @@ const AssetDetailDrawer = ({ asset, isOpen, onClose, onUpdated }) => {
 
   const tabs = [
     { id: 'details', label: 'Details' },
-    { id: 'custom', label: 'Custom Fields' },
     { id: 'assignment', label: 'Assignment' },
   ]
 
   const isAssigned = detail?.status === 'assigned'
   const customFields = detail?.custom_fields || {}
-  const hasCustomFields = Object.keys(customFields).some(k => customFields[k] !== '' && customFields[k] !== null && customFields[k] !== undefined)
+
+  // Build ordered list of custom field rows, using category metadata for label + type
+  const fieldMeta = categoryFields || []
+  const metaByName = Object.fromEntries(fieldMeta.map(f => [f.field_name, f]))
+  const orderedKeys = [
+    ...fieldMeta.map(f => f.field_name).filter(k => k in customFields),
+    ...Object.keys(customFields).filter(k => !(k in metaByName)),
+  ]
+  const customRows = orderedKeys
+    .map(key => ({ key, value: customFields[key], meta: metaByName[key] }))
+    .filter(({ value }) => value !== '' && value !== null && value !== undefined)
+
+  const formatCustomValue = (value, meta) => {
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+    if (meta?.field_type === 'boolean') return value ? 'Yes' : 'No'
+    return String(value ?? '—')
+  }
+
+  const labelFor = (key, meta) =>
+    meta?.field_label ||
+    key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
 
   // Status options filtered: don't show current status; if assigned, show nothing (can't change)
   const availableStatusOptions = STATUS_OPTIONS.filter(s => s.value !== detail?.status)
@@ -174,40 +201,27 @@ const AssetDetailDrawer = ({ asset, isOpen, onClose, onUpdated }) => {
                 <InfoRow label="Purchase Date" value={formatDate(detail?.purchase_date)} />
                 <InfoRow label="Warranty Expiry" value={formatDate(detail?.warranty_expiry)} />
                 <InfoRow label="Added On" value={formatDate(detail?.created_at)} />
+
+                {customRows.length > 0 && (
+                  <>
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mt-5 mb-1">
+                      {detail?.category_name ? `${detail.category_name} Fields` : 'Additional Fields'}
+                    </p>
+                    {customRows.map(({ key, value, meta }) => (
+                      <InfoRow
+                        key={key}
+                        label={labelFor(key, meta)}
+                        value={formatCustomValue(value, meta)}
+                      />
+                    ))}
+                  </>
+                )}
+
                 {detail?.remarks && (
                   <div className="mt-3">
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">Remarks</p>
                     <p className="text-sm text-slate-700 bg-slate-50 rounded-lg px-3 py-2.5">{detail.remarks}</p>
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* Custom Fields tab */}
-            {tab === 'custom' && (
-              <div>
-                {!hasCustomFields ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                    <svg className="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h8" />
-                    </svg>
-                    <p className="text-sm text-slate-500">No custom field data for this asset</p>
-                    <p className="text-xs text-slate-400 mt-1">Edit the asset to fill in category-specific fields</p>
-                  </div>
-                ) : (
-                  Object.entries(customFields)
-                    .filter(([, v]) => v !== '' && v !== null && v !== undefined)
-                    .map(([key, value]) => (
-                      <InfoRow
-                        key={key}
-                        label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        value={
-                          typeof value === 'boolean'
-                            ? (value ? 'Yes' : 'No')
-                            : String(value ?? '—')
-                        }
-                      />
-                    ))
                 )}
               </div>
             )}

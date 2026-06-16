@@ -43,4 +43,10 @@ const setActiveStatus = asyncHandler(async (req, res) => {
   sendSuccess(res, user, `User ${is_active ? 'activated' : 'deactivated'} successfully`);
 });
 
-module.exports = { getAllUsers, getUser, createUser, updateRole, setActiveStatus };
+/** DELETE /api/users/:id */
+const deleteUser = asyncHandler(async (req, res) => {
+  await userService.deleteUser(req.params.id, req.user);
+  sendSuccess(res, null, 'User deleted successfully');
+});
+
+module.exports = { getAllUsers, getUser, createUser, updateRole, setActiveStatus, deleteUser };

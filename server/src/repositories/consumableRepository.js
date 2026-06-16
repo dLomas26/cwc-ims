@@ -253,12 +253,12 @@ const findAssignmentById = async (id) => {
   return result.rows[0] || null;
 };
 
-const createAssignment = async ({ consumable_id, employee_id, quantity, is_returnable, remarks, assigned_by }) => {
+const createAssignment = async ({ consumable_id, employee_id, quantity, is_returnable, remarks, assigned_at, assigned_by }) => {
   const result = await query(
     `INSERT INTO consumable_assignments (consumable_id, employee_id, quantity, is_returnable, remarks, assigned_by, is_active, assigned_at)
-     VALUES ($1, $2, $3, $4, $5, $6, true, NOW())
+     VALUES ($1, $2, $3, $4, $5, $6, true, COALESCE($7::timestamptz, NOW()))
      RETURNING *`,
-    [consumable_id, employee_id, quantity, !!is_returnable, remarks || null, assigned_by]
+    [consumable_id, employee_id, quantity, !!is_returnable, remarks || null, assigned_by, assigned_at || null]
   );
   return result.rows[0];
 };

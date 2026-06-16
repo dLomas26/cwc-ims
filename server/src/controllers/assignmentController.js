@@ -34,4 +34,10 @@ const getHistory = asyncHandler(async (req, res) => {
   sendSuccess(res, result.history, 'Assignment history retrieved', 200, result.meta);
 });
 
-module.exports = { getAllAssignments, assignAsset, returnAsset, getHistory };
+/** DELETE /api/assignments/:id */
+const deleteAssignment = asyncHandler(async (req, res) => {
+  await assignmentService.deleteAssignment(req.params.id);
+  sendSuccess(res, null, 'Assignment deleted successfully');
+});
+
+module.exports = { getAllAssignments, assignAsset, returnAsset, getHistory, deleteAssignment };

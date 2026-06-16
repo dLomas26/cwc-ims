@@ -5,4 +5,5 @@ export const assignmentApi = {
   assign: (data) => api.post('/assignments', data),
   return: (id, data) => api.patch(`/assignments/${id}/return`, data),
   getHistory: (params) => api.get('/assignments/history', { params }),
+  delete: (id) => api.delete(`/assignments/${id}`),
 }

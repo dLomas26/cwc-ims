@@ -18,6 +18,7 @@ const schema = z.object({
   purchase_date: z.string().optional(),
   warranty_expiry: z.string().optional(),
   remarks: z.string().optional(),
+  custom_fields: z.record(z.any()).optional(),
 })
 
 const CustomField = ({ field, register, errors, control }) => {

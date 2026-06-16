@@ -11,6 +11,8 @@ const createAssignmentSchema = z.object({
   // Optional: if provided, these get saved to the asset record too
   serial_number: z.string().optional(),
   asset_number: z.string().optional(),
+  // Optional back-dated assignment timestamp; defaults to NOW() if omitted
+  assigned_at: z.string().optional(),
   remarks: z.string().optional(),
 });
 
