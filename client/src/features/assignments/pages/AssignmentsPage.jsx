@@ -213,7 +213,9 @@ const AssignmentsPage = () => {
     queryClient.invalidateQueries({ queryKey: ['assignments-history'] })
     queryClient.invalidateQueries({ queryKey: ['assets'] })
     queryClient.invalidateQueries({ queryKey: ['asset'] })
+    queryClient.invalidateQueries({ queryKey: ['assets-available'] })
     queryClient.invalidateQueries({ queryKey: ['employees'] })
+    queryClient.invalidateQueries({ queryKey: ['employees-active'] })
     queryClient.invalidateQueries({ queryKey: ['employee'] })
     queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
   }

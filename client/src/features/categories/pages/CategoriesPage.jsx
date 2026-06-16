@@ -154,13 +154,14 @@ const CategoriesPage = () => {
         onClose={deleteDialog.close}
         onConfirm={() => deleteMutation.mutate()}
         loading={deleteMutation.isPending}
-        title="Delete Category?"
+        title={`Delete "${deleteTarget?.name}"?`}
         message={
           deleteTarget?.asset_count > 0
             ? `⚠️ Cannot delete "${deleteTarget?.name}" — it has ${deleteTarget.asset_count} asset(s) associated with it. Please reassign or delete those assets first.`
-            : `This will permanently delete the "${deleteTarget?.name}" category and all its custom field definitions. This cannot be undone.`
+            : `This will permanently delete the "${deleteTarget?.name}" category and all its custom field definitions. This action cannot be undone.`
         }
-        confirmLabel="Delete"
+        confirmLabel="Delete Permanently"
+        confirmVariant="danger"
         confirmDisabled={deleteTarget?.asset_count > 0}
       />
     </div>

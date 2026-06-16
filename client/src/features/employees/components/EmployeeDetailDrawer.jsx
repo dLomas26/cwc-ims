@@ -282,7 +282,7 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
         onClose={() => setDeleteOpen(false)}
         onConfirm={() => deleteMutation.mutate()}
         loading={deleteMutation.isPending}
-        title="Delete Employee?"
+        title={`Delete "${employee.name}"?`}
         message={
           hasActiveAssignments
             ? `⚠️ ${employee.name} has ${employee.assigned_count} asset(s) currently assigned. Please return all assets before deleting.`

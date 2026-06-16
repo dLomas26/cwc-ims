@@ -162,7 +162,7 @@ const SettingsPage = () => {
           <Card>
             <h3 className="text-sm font-semibold text-slate-700 mb-3">Modules</h3>
             <div className="grid grid-cols-2 gap-2">
-              {['Employees', 'Assets', 'Categories', 'Dynamic Fields', 'Assignments', 'Consumables', 'Stock Management', 'Reports', 'Excel Export', 'Role Management'].map(mod => (
+              {['Employees', 'Assets', 'Categories', 'Dynamic Fields', 'Assignments', 'Bulk Inventory', 'Stock Management', 'Issue & Return', 'Reports', 'Excel Export', 'Role Management'].map(mod => (
                 <div key={mod} className="flex items-center gap-2 text-sm text-slate-600">
                   <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />

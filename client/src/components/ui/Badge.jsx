@@ -9,6 +9,8 @@ const statusConfig = {
   good: { label: 'Good Condition', className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
   stock_in: { label: 'Stock In', className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
   stock_out: { label: 'Stock Out', className: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200' },
+  issued: { label: 'Issued', className: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200' },
+  returned: { label: 'Returned', className: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
   super_admin: { label: 'Super Admin', className: 'bg-violet-50 text-violet-700 ring-1 ring-violet-200' },
   admin: { label: 'Admin', className: 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200' },
   viewer: { label: 'Viewer', className: 'bg-slate-100 text-slate-600 ring-1 ring-slate-200' },

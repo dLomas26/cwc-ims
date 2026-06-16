@@ -1,8 +1,14 @@
 -- ============================================================
 -- CWC Inventory Management — Database Schema
 -- ============================================================
--- Run this file in Supabase SQL Editor OR use: node seed.js
+-- Single source of truth. Run via: node seed.js
+-- (or paste into Supabase SQL Editor)
+--
 -- Employee IDs and Asset IDs are manually entered by admin.
+-- "Returnable vs consumed-on-issue" for bulk-inventory items
+-- (consumables) is a per-issuance decision — recorded on
+-- consumable_assignments, NOT on the consumables table itself,
+-- so the same item (e.g. mouse) can be issued either way.
 -- ============================================================
 
 -- Enable UUID generation
@@ -34,16 +40,16 @@ CREATE TABLE IF NOT EXISTS categories (
 
 -- ─── Category Custom Fields ────────────────────────────────────
 CREATE TABLE IF NOT EXISTS category_fields (
-  id           SERIAL      PRIMARY KEY,
-  category_id  INTEGER     NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
-  field_name   TEXT        NOT NULL,
-  field_label  TEXT        NOT NULL,
-  field_type   TEXT        NOT NULL DEFAULT 'text'
-               CHECK (field_type IN ('text', 'number', 'date', 'boolean', 'select')),
+  id            SERIAL      PRIMARY KEY,
+  category_id   INTEGER     NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  field_name    TEXT        NOT NULL,
+  field_label   TEXT        NOT NULL,
+  field_type    TEXT        NOT NULL DEFAULT 'text'
+                CHECK (field_type IN ('text', 'number', 'date', 'boolean', 'select')),
   field_options JSONB,
-  is_required  BOOLEAN     NOT NULL DEFAULT false,
-  sort_order   INTEGER     NOT NULL DEFAULT 0,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  is_required   BOOLEAN     NOT NULL DEFAULT false,
+  sort_order    INTEGER     NOT NULL DEFAULT 0,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(category_id, field_name)
 );
 
@@ -72,29 +78,29 @@ CREATE INDEX IF NOT EXISTS idx_employees_is_archived ON employees(is_archived);
 -- asset_id is entered by admin, serves as the unique display identifier.
 -- Internal UUID (id) is used for foreign key relationships.
 CREATE TABLE IF NOT EXISTS assets (
-  id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  asset_id       TEXT        UNIQUE NOT NULL,  -- admin-entered, e.g. "LAP-001" or "PC2024-05"
-  category_id    INTEGER     NOT NULL REFERENCES categories(id),
-  product_name   TEXT,
-  model          TEXT,
-  serial_number  TEXT,
-  asset_number   TEXT,
-  purchase_date  DATE,
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_id        TEXT        UNIQUE NOT NULL,  -- admin-entered, e.g. "LAP-001" or "PC2024-05"
+  category_id     INTEGER     NOT NULL REFERENCES categories(id),
+  product_name    TEXT,
+  model           TEXT,
+  serial_number   TEXT,
+  asset_number    TEXT,
+  purchase_date   DATE,
   warranty_expiry DATE,
-  status         TEXT        NOT NULL DEFAULT 'available'
-                 CHECK (status IN ('available', 'assigned', 'under_repair', 'damaged', 'retired')),
-  custom_fields  JSONB       DEFAULT '{}',
-  remarks        TEXT,
-  created_by     UUID        REFERENCES users(id) ON DELETE SET NULL,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  status          TEXT        NOT NULL DEFAULT 'available'
+                  CHECK (status IN ('available', 'assigned', 'under_repair', 'damaged', 'retired')),
+  custom_fields   JSONB       DEFAULT '{}',
+  remarks         TEXT,
+  created_by      UUID        REFERENCES users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_assets_asset_id ON assets(asset_id);
 CREATE INDEX IF NOT EXISTS idx_assets_category_id ON assets(category_id);
 CREATE INDEX IF NOT EXISTS idx_assets_status ON assets(status);
 
--- ─── Assignments ──────────────────────────────────────────────
+-- ─── Asset Assignments ────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS assignments (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id      UUID        NOT NULL REFERENCES employees(id),
@@ -115,7 +121,9 @@ CREATE INDEX IF NOT EXISTS idx_assignments_employee_id ON assignments(employee_i
 CREATE INDEX IF NOT EXISTS idx_assignments_asset_id ON assignments(asset_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_is_active ON assignments(is_active);
 
--- ─── Consumables ──────────────────────────────────────────────
+-- ─── Consumables (Bulk Inventory) ─────────────────────────────
+-- Items bought in bulk: cartridges, cables, mice, keyboards, etc.
+-- Returnable-vs-consumed is decided at issue time, not here.
 CREATE TABLE IF NOT EXISTS consumables (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   name             TEXT        NOT NULL,
@@ -130,19 +138,55 @@ CREATE TABLE IF NOT EXISTS consumables (
 );
 
 -- ─── Stock Transactions ───────────────────────────────────────
+-- Audit log for every stock movement: in, out, damaged, issued, returned.
+-- employee_id is set when the movement is tied to a specific person
+-- (issued / returned), null otherwise (stock_in / stock_out / damaged).
 CREATE TABLE IF NOT EXISTS stock_transactions (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   consumable_id    UUID        NOT NULL REFERENCES consumables(id) ON DELETE CASCADE,
   transaction_type TEXT        NOT NULL
-                   CHECK (transaction_type IN ('stock_in', 'stock_out', 'damaged')),
-  quantity         INTEGER     NOT NULL CHECK (quantity > 0),
+                   CHECK (transaction_type IN ('stock_in', 'stock_out', 'damaged', 'issued', 'returned')),
+  quantity         INTEGER     NOT NULL CHECK (quantity >= 0),
   reference        TEXT,
   remarks          TEXT,
   performed_by     UUID        REFERENCES users(id) ON DELETE SET NULL,
+  employee_id      UUID        REFERENCES employees(id) ON DELETE SET NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_stock_transactions_consumable_id ON stock_transactions(consumable_id);
+CREATE INDEX IF NOT EXISTS idx_stock_transactions_employee_id ON stock_transactions(employee_id);
+
+-- ─── Consumable Assignments (Issuances) ──────────────────────
+-- Tracks each issuance of a bulk-inventory item to an employee.
+-- is_returnable is set per-issue:
+--   true  → must be returned later (e.g. mouse, keyboard)
+--   false → consumed on issue (e.g. cartridge, ink); record is
+--           still kept for the employee's history but is_active
+--           is closed immediately.
+CREATE TABLE IF NOT EXISTS consumable_assignments (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  consumable_id     UUID        NOT NULL REFERENCES consumables(id) ON DELETE CASCADE,
+  employee_id       UUID        NOT NULL REFERENCES employees(id),
+  quantity          INTEGER     NOT NULL CHECK (quantity > 0),
+  is_returnable     BOOLEAN     NOT NULL DEFAULT false,
+  assigned_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  assigned_by       UUID        REFERENCES users(id) ON DELETE SET NULL,
+  returned_at       TIMESTAMPTZ,
+  returned_quantity INTEGER     CHECK (returned_quantity IS NULL OR returned_quantity >= 0),
+  return_condition  TEXT        CHECK (return_condition IN ('good', 'damaged')),
+  returned_by       UUID        REFERENCES users(id) ON DELETE SET NULL,
+  return_remarks    TEXT,
+  is_active         BOOLEAN     NOT NULL DEFAULT true,
+  remarks           TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cons_assignments_consumable ON consumable_assignments(consumable_id);
+CREATE INDEX IF NOT EXISTS idx_cons_assignments_employee ON consumable_assignments(employee_id);
+CREATE INDEX IF NOT EXISTS idx_cons_assignments_is_active ON consumable_assignments(is_active);
+CREATE INDEX IF NOT EXISTS idx_cons_assignments_is_returnable ON consumable_assignments(is_returnable);
 
 -- ─── Auto-update updated_at trigger ──────────────────────────
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -186,5 +230,11 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE TRIGGER trg_consumables_updated_at
     BEFORE UPDATE ON consumables
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE TRIGGER trg_consumable_assignments_updated_at
+    BEFORE UPDATE ON consumable_assignments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;

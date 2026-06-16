@@ -79,7 +79,7 @@ const navItems = [
     ),
   },
   {
-    label: "Consumables",
+    label: "Bulk Inventory",
     path: "/consumables",
     icon: (
       <svg

@@ -1,11 +1,12 @@
 const { z } = require('zod');
+const { RETURN_CONDITIONS } = require('../constants');
 
 /**
- * Consumable validation schemas
+ * Consumable (Bulk Inventory) validation schemas
  */
 
 const createConsumableSchema = z.object({
-  name: z.string().min(1, 'Consumable name is required'),
+  name: z.string().min(1, 'Item name is required'),
   category: z.string().optional(),
   unit: z.string().optional(),
   remarks: z.string().optional(),
@@ -18,9 +19,6 @@ const updateConsumableSchema = z.object({
   remarks: z.string().optional(),
 });
 
-/**
- * Schema for stock transactions (stock-in, stock-out, damaged)
- */
 const stockTransactionSchema = z.object({
   quantity: z
     .coerce
@@ -31,4 +29,34 @@ const stockTransactionSchema = z.object({
   remarks: z.string().optional(),
 });
 
-module.exports = { createConsumableSchema, updateConsumableSchema, stockTransactionSchema };
+const issueConsumableSchema = z.object({
+  employee_id: z.string().uuid('Employee ID must be a valid UUID'),
+  quantity: z
+    .coerce
+    .number({ required_error: 'Quantity is required' })
+    .int('Quantity must be a whole number')
+    .min(1, 'Quantity must be at least 1'),
+  is_returnable: z.boolean({ required_error: 'is_returnable is required' }),
+  remarks: z.string().optional(),
+});
+
+const returnConsumableSchema = z.object({
+  returned_quantity: z
+    .coerce
+    .number({ required_error: 'Returned quantity is required' })
+    .int('Quantity must be a whole number')
+    .min(0, 'Quantity cannot be negative'),
+  condition: z.enum(
+    [RETURN_CONDITIONS.GOOD, RETURN_CONDITIONS.DAMAGED],
+    { errorMap: () => ({ message: 'Condition must be either "good" or "damaged"' }) }
+  ),
+  remarks: z.string().optional(),
+});
+
+module.exports = {
+  createConsumableSchema,
+  updateConsumableSchema,
+  stockTransactionSchema,
+  issueConsumableSchema,
+  returnConsumableSchema,
+};

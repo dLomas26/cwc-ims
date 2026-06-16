@@ -17,7 +17,7 @@ const TABS = [
   { id: 'categories', label: 'Category Breakdown' },
   { id: 'asset-status', label: 'Asset Status' },
   { id: 'assignment-history', label: 'Assignment History' },
-  { id: 'stock', label: 'Stock Report' },
+  { id: 'stock', label: 'Bulk Inventory Stock' },
   { id: 'damaged', label: 'Damaged Assets' },
 ]
 
@@ -214,7 +214,7 @@ const StockReportTab = () => {
   return (
     <div>
       <div className="flex justify-end mb-4"><ExportButton onClick={handleExport} loading={exporting} /></div>
-      <DataTable columns={columns} data={data || []} isLoading={isLoading} emptyMessage="No consumables found" />
+      <DataTable columns={columns} data={data || []} isLoading={isLoading} emptyMessage="No items found" />
     </div>
   )
 }

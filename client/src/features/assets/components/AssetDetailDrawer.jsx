@@ -365,11 +365,11 @@ const AssetDetailDrawer = ({ asset, isOpen, onClose, onUpdated }) => {
         onConfirm={() => deleteMutation.mutate()}
         loading={deleteMutation.isPending}
         confirmDisabled={isAssigned}
-        title="Delete Asset?"
+        title={`Delete "${detail?.asset_id}"?`}
         message={
           isAssigned
             ? `⚠️ This asset is currently assigned. Please return it before deleting.`
-            : `This will permanently delete asset ${detail?.asset_id}. All data including assignment history will be removed. This cannot be undone.`
+            : `This will permanently delete asset ${detail?.asset_id}${detail?.product_name ? ` (${detail.product_name})` : ''} and all its assignment history. This action cannot be undone.`
         }
         confirmLabel="Delete Permanently"
         confirmVariant="danger"
