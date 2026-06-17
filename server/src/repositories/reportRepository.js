@@ -187,6 +187,70 @@ const getConsumableStock = async () => {
 };
 
 /**
+ * Get full audit log of bulk-inventory (consumable) stock transactions
+ * with optional date / type / consumable filters.
+ * @param {Object} params
+ * @param {string} [params.from_date]
+ * @param {string} [params.to_date]
+ * @param {string} [params.transaction_type]
+ * @param {string} [params.consumable_id]
+ * @returns {Object[]}
+ */
+const getBulkInventoryTransactions = async ({ from_date, to_date, transaction_type, consumable_id } = {}) => {
+  const conditions = [];
+  const params = [];
+
+  if (from_date) {
+    params.push(from_date);
+    conditions.push(`st.created_at >= $${params.length}`);
+  }
+
+  if (to_date) {
+    params.push(to_date);
+    conditions.push(`st.created_at <= $${params.length}`);
+  }
+
+  if (transaction_type) {
+    params.push(transaction_type);
+    conditions.push(`st.transaction_type = $${params.length}`);
+  }
+
+  if (consumable_id) {
+    params.push(consumable_id);
+    conditions.push(`st.consumable_id = $${params.length}`);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const result = await query(
+    `SELECT
+       st.id,
+       st.transaction_type,
+       st.quantity,
+       st.reference,
+       st.remarks,
+       st.created_at,
+       c.id AS consumable_id,
+       c.name AS consumable_name,
+       c.category AS consumable_category,
+       c.unit AS consumable_unit,
+       e.id AS employee_id,
+       e.name AS employee_name,
+       e.employee_code,
+       e.division AS employee_division,
+       u.full_name AS performed_by_name
+     FROM stock_transactions st
+     JOIN consumables c ON c.id = st.consumable_id
+     LEFT JOIN employees e ON e.id = st.employee_id
+     LEFT JOIN users u ON u.id = st.performed_by
+     ${whereClause}
+     ORDER BY st.created_at DESC`,
+    params
+  );
+  return result.rows;
+};
+
+/**
  * Get all assets with status 'damaged'
  * @returns {Object[]}
  */
@@ -213,5 +277,6 @@ module.exports = {
   getAssetStatusReport,
   getAssignmentHistory,
   getConsumableStock,
+  getBulkInventoryTransactions,
   getDamagedAssets,
 };

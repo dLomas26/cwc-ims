@@ -7,10 +7,12 @@ import DataTable from '../../../components/ui/DataTable'
 import Badge from '../../../components/ui/Badge'
 import Select from '../../../components/ui/Select'
 import Card from '../../../components/ui/Card'
+import Modal from '../../../components/ui/Modal'
 import { PageLoader } from '../../../components/ui/Loader'
 import { useToast } from '../../../store/ToastContext'
-import { formatDate } from '../../../utils/formatters'
+import { formatDate, formatDateTime } from '../../../utils/formatters'
 import { categoryApi } from '../../../api/categoryApi'
+import { consumableApi } from '../../../api/consumableApi'
 
 const TABS = [
   { id: 'employees', label: 'Employee Assets' },
@@ -18,6 +20,7 @@ const TABS = [
   { id: 'asset-status', label: 'Asset Status' },
   { id: 'assignment-history', label: 'Assignment History' },
   { id: 'stock', label: 'Bulk Inventory Stock' },
+  { id: 'bulk-transactions', label: 'Bulk Inventory Transactions' },
   { id: 'damaged', label: 'Damaged Assets' },
 ]
   
@@ -219,6 +222,181 @@ const StockReportTab = () => {
   )
 }
 
+// ─── Bulk Inventory Transactions Tab ───────────────────────────
+const TX_TYPE_OPTIONS = [
+  { value: 'stock_in', label: 'Stock In' },
+  { value: 'stock_out', label: 'Stock Out' },
+  { value: 'damaged', label: 'Marked Damaged' },
+  { value: 'issued', label: 'Issued' },
+  { value: 'returned', label: 'Returned' },
+]
+
+const BulkInventoryTransactionsTab = () => {
+  const toast = useToast()
+  const [exporting, setExporting] = useState(false)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [txType, setTxType] = useState('')
+  const [consumableId, setConsumableId] = useState('')
+  const [selectedTx, setSelectedTx] = useState(null)
+
+  const { data: consumables } = useQuery({
+    queryKey: ['consumables-all-for-reports'],
+    queryFn: () => consumableApi.getAll({ limit: 500 }).then(r => r.data.data),
+  })
+
+  const filters = {
+    from_date: fromDate || undefined,
+    to_date: toDate || undefined,
+    transaction_type: txType || undefined,
+    consumable_id: consumableId || undefined,
+  }
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['report-bulk-inventory-transactions', filters],
+    queryFn: () => reportApi.getBulkInventoryTransactions(filters).then(r => r.data.data),
+  })
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const res = await exportApi.exportBulkInventoryTransactions(filters)
+      downloadBlob(res.data, `bulk-inventory-transactions-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    } catch { toast.error('Export failed') } finally { setExporting(false) }
+  }
+
+  const inputCls = 'h-9 px-3 rounded-lg border border-slate-200 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 bg-white'
+
+  const columns = [
+    { key: 'created_at', header: 'Date', render: v => <span className="text-xs text-slate-600 whitespace-nowrap">{formatDateTime(v)}</span> },
+    {
+      key: 'consumable_name', header: 'Item',
+      render: (v, r) => <div><p className="font-medium text-slate-800">{v}</p>{r.consumable_category && <p className="text-xs text-slate-500">{r.consumable_category}</p>}</div>,
+    },
+    { key: 'transaction_type', header: 'Type', render: v => <Badge status={v} /> },
+    {
+      key: 'quantity', header: 'Qty',
+      render: (v, r) => {
+        const sign = r.transaction_type === 'stock_in' || r.transaction_type === 'returned'
+          ? '+'
+          : r.transaction_type === 'damaged'
+            ? '⚠'
+            : '-'
+        return <span className="font-semibold text-slate-800">{sign}{v} {r.consumable_unit || ''}</span>
+      },
+    },
+    {
+      key: 'employee_name', header: 'Employee',
+      render: (v, r) => v
+        ? <div><p className="font-medium text-sm">{v}</p>{r.employee_code && <p className="text-xs text-slate-400">{r.employee_code}</p>}</div>
+        : <span className="text-slate-400 text-xs">—</span>,
+    },
+    { key: 'reference', header: 'Reference', render: v => v || <span className="text-slate-400 text-xs">—</span> },
+    {
+      key: 'remarks', header: 'Remarks',
+      render: v => v
+        ? <span className="text-xs text-slate-600 line-clamp-2 max-w-xs block">{v}</span>
+        : <span className="text-slate-400 text-xs">—</span>,
+    },
+    { key: 'performed_by_name', header: 'By', render: v => v || <span className="text-slate-400 text-xs">—</span> },
+  ]
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div className="flex gap-3 flex-wrap items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500">From</label>
+            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className={inputCls} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500">To</label>
+            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className={inputCls} />
+          </div>
+          <Select value={txType} onChange={e => setTxType(e.target.value)} options={TX_TYPE_OPTIONS} placeholder="All Types" className="w-40" />
+          <Select value={consumableId} onChange={e => setConsumableId(e.target.value)}
+            options={(consumables || []).map(c => ({ value: c.id, label: c.name }))}
+            placeholder="All Items" className="w-52" />
+          {(fromDate || toDate || txType || consumableId) && (
+            <Button variant="secondary" size="sm" onClick={() => { setFromDate(''); setToDate(''); setTxType(''); setConsumableId('') }}>
+              Clear
+            </Button>
+          )}
+        </div>
+        <ExportButton onClick={handleExport} loading={exporting} />
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={data || []}
+        isLoading={isLoading}
+        emptyMessage="No transactions found"
+        onRowClick={(row) => setSelectedTx(row)}
+      />
+
+      <BulkInventoryTransactionDetailModal
+        isOpen={!!selectedTx}
+        onClose={() => setSelectedTx(null)}
+        transaction={selectedTx}
+      />
+    </div>
+  )
+}
+
+const TX_LABELS = {
+  stock_in: 'Stock In',
+  stock_out: 'Stock Out',
+  damaged: 'Marked Damaged',
+  issued: 'Issued',
+  returned: 'Returned',
+}
+
+const BulkInventoryTransactionDetailModal = ({ isOpen, onClose, transaction }) => {
+  if (!transaction) return null
+
+  const sign = transaction.transaction_type === 'stock_in' || transaction.transaction_type === 'returned'
+    ? '+'
+    : transaction.transaction_type === 'damaged'
+      ? '⚠'
+      : '-'
+
+  const rows = [
+    { label: 'Type', value: <Badge status={transaction.transaction_type} /> },
+    { label: 'Item', value: <span className="font-medium">{transaction.consumable_name}{transaction.consumable_category ? ` · ${transaction.consumable_category}` : ''}</span> },
+    { label: 'Quantity', value: <span className="font-semibold text-slate-800">{sign}{transaction.quantity} {transaction.consumable_unit || ''}</span> },
+    { label: 'Date of Issue', value: formatDateTime(transaction.created_at) },
+    transaction.employee_name ? { label: 'Employee', value: `${transaction.employee_name}${transaction.employee_code ? ` (${transaction.employee_code})` : ''}${transaction.employee_division ? ` — ${transaction.employee_division}` : ''}` } : null,
+    transaction.reference ? { label: 'Reference', value: transaction.reference } : null,
+    transaction.performed_by_name ? { label: 'Performed By', value: transaction.performed_by_name } : null,
+  ].filter(Boolean)
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Transaction — ${TX_LABELS[transaction.transaction_type] || transaction.transaction_type}`}
+      size="md"
+      footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
+    >
+      <div className="flex flex-col">
+        {rows.map(r => (
+          <div key={r.label} className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0">
+            <span className="text-xs text-slate-500 w-32 shrink-0 pt-0.5">{r.label}</span>
+            <span className="text-sm text-slate-800 flex-1 break-words">{r.value}</span>
+          </div>
+        ))}
+
+        <div className="mt-3">
+          <p className="text-xs text-slate-500 mb-1.5">Remarks</p>
+          <div className="text-sm text-slate-800 bg-slate-50 rounded-lg px-3 py-2.5 min-h-[3rem] whitespace-pre-wrap break-words">
+            {transaction.remarks || <span className="text-slate-400 italic">No remarks</span>}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ─── Damaged Assets Tab ────────────────────────────────────────
 const DamagedAssetsTab = () => {
   const { data, isLoading } = useQuery({
@@ -245,6 +423,7 @@ const TAB_COMPONENTS = {
   'asset-status': AssetStatusTab,
   'assignment-history': AssignmentHistoryTab,
   'stock': StockReportTab,
+  'bulk-transactions': BulkInventoryTransactionsTab,
   'damaged': DamagedAssetsTab,
 }
 

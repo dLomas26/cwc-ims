@@ -24,6 +24,9 @@ router.get('/assignment-history', authenticateJWT, reportController.getAssignmen
 // GET /api/reports/consumable-stock — all consumables with stock details
 router.get('/consumable-stock', authenticateJWT, reportController.getConsumableStockReport);
 
+// GET /api/reports/bulk-inventory-transactions — full audit log of bulk inventory stock movements
+router.get('/bulk-inventory-transactions', authenticateJWT, reportController.getBulkInventoryTransactionsReport);
+
 // GET /api/reports/damaged-assets — all damaged assets
 router.get('/damaged-assets', authenticateJWT, reportController.getDamagedAssetsReport);
 

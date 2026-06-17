@@ -38,6 +38,18 @@ const getConsumableStockReport = asyncHandler(async (req, res) => {
   sendSuccess(res, data, 'Consumable stock report retrieved');
 });
 
+/** GET /api/reports/bulk-inventory-transactions */
+const getBulkInventoryTransactionsReport = asyncHandler(async (req, res) => {
+  const { from_date, to_date, transaction_type, consumable_id } = req.query;
+  const data = await reportService.getBulkInventoryTransactions({
+    from_date,
+    to_date,
+    transaction_type,
+    consumable_id,
+  });
+  sendSuccess(res, data, 'Bulk inventory transactions report retrieved');
+});
+
 /** GET /api/reports/damaged-assets */
 const getDamagedAssetsReport = asyncHandler(async (req, res) => {
   const data = await reportService.getDamagedAssets();
@@ -50,5 +62,6 @@ module.exports = {
   getAssetStatusReport,
   getAssignmentHistoryReport,
   getConsumableStockReport,
+  getBulkInventoryTransactionsReport,
   getDamagedAssetsReport,
 };

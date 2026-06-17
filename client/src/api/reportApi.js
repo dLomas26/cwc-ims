@@ -6,6 +6,7 @@ export const reportApi = {
   getAssetStatus: (params) => api.get('/reports/asset-status', { params }),
   getAssignmentHistory: (params) => api.get('/reports/assignment-history', { params }),
   getConsumableStock: () => api.get('/reports/consumable-stock'),
+  getBulkInventoryTransactions: (params) => api.get('/reports/bulk-inventory-transactions', { params }),
   getDamagedAssets: () => api.get('/reports/damaged-assets'),
 }
 
@@ -14,6 +15,8 @@ export const exportApi = {
   exportAssets: () => api.get('/export/assets', { responseType: 'blob' }),
   exportAssignments: () => api.get('/export/assignments', { responseType: 'blob' }),
   exportStock: () => api.get('/export/stock', { responseType: 'blob' }),
+  exportBulkInventoryTransactions: (params) =>
+    api.get('/export/bulk-inventory-transactions', { params, responseType: 'blob' }),
 }
 
 export const downloadBlob = (blob, filename) => {

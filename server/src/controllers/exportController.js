@@ -168,4 +168,66 @@ const exportStock = asyncHandler(async (req, res) => {
   res.send(buffer);
 });
 
-module.exports = { exportEmployees, exportAssets, exportAssignments, exportStock };
+const TRANSACTION_TYPE_LABELS = {
+  stock_in: 'Stock In',
+  stock_out: 'Stock Out',
+  damaged: 'Marked Damaged',
+  issued: 'Issued',
+  returned: 'Returned',
+};
+
+/**
+ * GET /api/export/bulk-inventory-transactions
+ * Export full audit log of bulk inventory (consumable) stock movements
+ */
+const exportBulkInventoryTransactions = asyncHandler(async (req, res) => {
+  const { from_date, to_date, transaction_type, consumable_id } = req.query;
+  const transactions = await reportService.getBulkInventoryTransactions({
+    from_date,
+    to_date,
+    transaction_type,
+    consumable_id,
+  });
+
+  const columns = [
+    { header: 'Date', key: 'created_at', width: 22 },
+    { header: 'Item', key: 'consumable_name', width: 30 },
+    { header: 'Category', key: 'consumable_category', width: 20 },
+    { header: 'Unit', key: 'consumable_unit', width: 12 },
+    { header: 'Transaction Type', key: 'transaction_type', width: 18 },
+    { header: 'Quantity', key: 'quantity', width: 12 },
+    { header: 'Employee', key: 'employee_name', width: 25 },
+    { header: 'Employee Code', key: 'employee_code', width: 15 },
+    { header: 'Division', key: 'employee_division', width: 20 },
+    { header: 'Reference', key: 'reference', width: 25 },
+    { header: 'Remarks', key: 'remarks', width: 35 },
+    { header: 'Performed By', key: 'performed_by_name', width: 22 },
+  ];
+
+  const rows = transactions.map((t) => ({
+    created_at: t.created_at ? new Date(t.created_at).toLocaleString('en-IN') : '',
+    consumable_name: t.consumable_name || '',
+    consumable_category: t.consumable_category || '',
+    consumable_unit: t.consumable_unit || '',
+    transaction_type: TRANSACTION_TYPE_LABELS[t.transaction_type] || t.transaction_type || '',
+    quantity: parseInt(t.quantity, 10) || 0,
+    employee_name: t.employee_name || '',
+    employee_code: t.employee_code || '',
+    employee_division: t.employee_division || '',
+    reference: t.reference || '',
+    remarks: t.remarks || '',
+    performed_by_name: t.performed_by_name || '',
+  }));
+
+  const buffer = await createExcelWorkbook('Bulk Inventory Transactions', columns, rows);
+  setExcelHeaders(res, 'bulk_inventory_transactions');
+  res.send(buffer);
+});
+
+module.exports = {
+  exportEmployees,
+  exportAssets,
+  exportAssignments,
+  exportStock,
+  exportBulkInventoryTransactions,
+};

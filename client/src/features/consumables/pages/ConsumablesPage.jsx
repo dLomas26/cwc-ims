@@ -17,7 +17,7 @@ import Pagination from '../../../components/ui/Pagination'
 import ConfirmDialog from '../../../components/ui/ConfirmDialog'
 import DataTable from '../../../components/ui/DataTable'
 import { useToast } from '../../../store/ToastContext'
-import { formatDate, getDaysActive } from '../../../utils/formatters'
+import { formatDate, formatDateTime, getDaysActive } from '../../../utils/formatters'
 import useDisclosure from '../../../hooks/useDisclosure'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -314,6 +314,61 @@ const ReturnIssuanceModal = ({ isOpen, onClose, assignment, onSuccess }) => {
   )
 }
 
+// ─── Transaction Detail Modal ──────────────────────────────────
+const TX_LABELS = {
+  stock_in: 'Stock In',
+  stock_out: 'Stock Out',
+  damaged: 'Marked Damaged',
+  issued: 'Issued',
+  returned: 'Returned',
+}
+
+const TransactionDetailModal = ({ isOpen, onClose, transaction, consumable }) => {
+  if (!transaction) return null
+
+  const unit = consumable?.unit || 'units'
+  const sign = transaction.transaction_type === 'stock_in' || transaction.transaction_type === 'returned'
+    ? '+'
+    : transaction.transaction_type === 'damaged'
+      ? '⚠'
+      : '-'
+
+  const rows = [
+    { label: 'Type', value: <Badge status={transaction.transaction_type} /> },
+    { label: 'Quantity', value: <span className="font-semibold text-slate-800">{sign}{transaction.quantity} {unit}</span> },
+    { label: 'Date of Issue', value: formatDateTime(transaction.created_at) },
+    transaction.employee_name ? { label: 'Employee', value: `${transaction.employee_name}${transaction.employee_code ? ` (${transaction.employee_code})` : ''}` } : null,
+    transaction.reference ? { label: 'Reference', value: transaction.reference } : null,
+    transaction.performed_by_name ? { label: 'Performed By', value: transaction.performed_by_name } : null,
+  ].filter(Boolean)
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Transaction — ${TX_LABELS[transaction.transaction_type] || transaction.transaction_type}`}
+      size="sm"
+      footer={<Button variant="secondary" onClick={onClose}>Close</Button>}
+    >
+      <div className="flex flex-col">
+        {rows.map(r => (
+          <div key={r.label} className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0">
+            <span className="text-xs text-slate-500 w-28 shrink-0 pt-0.5">{r.label}</span>
+            <span className="text-sm text-slate-800 flex-1 break-words">{r.value}</span>
+          </div>
+        ))}
+
+        <div className="mt-3">
+          <p className="text-xs text-slate-500 mb-1.5">Remarks</p>
+          <div className="text-sm text-slate-800 bg-slate-50 rounded-lg px-3 py-2.5 min-h-[3rem] whitespace-pre-wrap break-words">
+            {transaction.remarks || <span className="text-slate-400 italic">No remarks</span>}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ─── Detail Drawer ─────────────────────────────────────────────
 const ConsumableDetailDrawer = ({ isOpen, onClose, consumable: initialConsumable, onUpdated }) => {
   const queryClient = useQueryClient()
@@ -324,6 +379,7 @@ const ConsumableDetailDrawer = ({ isOpen, onClose, consumable: initialConsumable
   const [returnAssignment, setReturnAssignment] = useState(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [txPage, setTxPage] = useState(1)
+  const [selectedTx, setSelectedTx] = useState(null)
 
   // Fetch live data so stock/issue counters update after every action.
   const { data: liveConsumable } = useQuery({
@@ -485,7 +541,12 @@ const ConsumableDetailDrawer = ({ isOpen, onClose, consumable: initialConsumable
               : (
                 <div className="space-y-2">
                   {(txData?.data || []).map(tx => (
-                    <div key={tx.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50">
+                    <button
+                      type="button"
+                      key={tx.id}
+                      onClick={() => setSelectedTx(tx)}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50 hover:border-indigo-200 transition-all text-left"
+                    >
                       <Badge status={tx.transaction_type} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-800">
@@ -495,7 +556,7 @@ const ConsumableDetailDrawer = ({ isOpen, onClose, consumable: initialConsumable
                         {tx.reference && !tx.employee_name && <p className="text-xs text-slate-500 truncate">{tx.reference}</p>}
                       </div>
                       <p className="text-xs text-slate-400 shrink-0">{formatDate(tx.created_at)}</p>
-                    </div>
+                    </button>
                   ))}
                   {txData?.meta?.totalPages > 1 && (
                     <div className="pt-2"><Pagination meta={txData.meta} onPageChange={setTxPage} /></div>
@@ -528,6 +589,13 @@ const ConsumableDetailDrawer = ({ isOpen, onClose, consumable: initialConsumable
         onClose={() => setReturnAssignment(null)}
         assignment={returnAssignment}
         onSuccess={refresh}
+      />
+
+      <TransactionDetailModal
+        isOpen={!!selectedTx}
+        onClose={() => setSelectedTx(null)}
+        transaction={selectedTx}
+        consumable={consumable}
       />
 
       <ConfirmDialog

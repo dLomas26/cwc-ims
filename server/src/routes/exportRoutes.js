@@ -21,4 +21,7 @@ router.get('/assignments', authenticateJWT, exportController.exportAssignments);
 // GET /api/export/stock — download consumable stock Excel file
 router.get('/stock', authenticateJWT, exportController.exportStock);
 
+// GET /api/export/bulk-inventory-transactions — download bulk inventory transactions Excel file
+router.get('/bulk-inventory-transactions', authenticateJWT, exportController.exportBulkInventoryTransactions);
+
 module.exports = router;

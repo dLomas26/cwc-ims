@@ -15,6 +15,9 @@ const getAssignmentHistory = async (filters) => reportRepository.getAssignmentHi
 
 const getConsumableStock = async () => reportRepository.getConsumableStock();
 
+const getBulkInventoryTransactions = async (filters) =>
+  reportRepository.getBulkInventoryTransactions(filters);
+
 const getDamagedAssets = async () => reportRepository.getDamagedAssets();
 
 module.exports = {
@@ -23,5 +26,6 @@ module.exports = {
   getAssetStatusReport,
   getAssignmentHistory,
   getConsumableStock,
+  getBulkInventoryTransactions,
   getDamagedAssets,
 };
