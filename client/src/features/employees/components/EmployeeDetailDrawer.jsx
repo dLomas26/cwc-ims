@@ -11,6 +11,7 @@ import DataTable from '../../../components/ui/DataTable'
 import { Spinner } from '../../../components/ui/Loader'
 import { formatDate } from '../../../utils/formatters'
 import EmployeeForm from './EmployeeForm'
+import MakeAndAssignAssetModal from './MakeAndAssignAssetModal'
 import { useToast } from '../../../store/ToastContext'
 
 const InfoRow = ({ label, value }) => (
@@ -24,6 +25,7 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
   const [tab, setTab] = useState('details')
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [makeAssignOpen, setMakeAssignOpen] = useState(false)
   const queryClient = useQueryClient()
   const { toast } = useToast()
 
@@ -157,6 +159,15 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
                   Archive
                 </Button>
               )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setMakeAssignOpen(true)}
+                disabled={!!employee.is_archived}
+                title={employee.is_archived ? 'Cannot assign assets to an archived employee' : 'Create a new asset and assign it directly'}
+              >
+                🖥️ Create &amp; Assign
+              </Button>
               <Button size="sm" onClick={() => setEditOpen(true)}>
                 Edit Employee
               </Button>
@@ -290,6 +301,17 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
         confirmLabel="Delete Permanently"
         confirmVariant="danger"
         confirmDisabled={hasActiveAssignments}
+      />
+
+      {/* ─── Make & Assign Asset Modal ───────────────────────────── */}
+      <MakeAndAssignAssetModal
+        isOpen={makeAssignOpen}
+        onClose={() => setMakeAssignOpen(false)}
+        employee={employee}
+        onSuccess={() => {
+          onUpdate?.()
+          setTab('equipment')
+        }}
       />
     </>
   )
