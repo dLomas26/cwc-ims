@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { employeeApi } from '../../../api/employeeApi'
+import { consumableApi } from '../../../api/consumableApi'
 import Drawer from '../../../components/ui/Drawer'
 import Tabs from '../../../components/ui/Tabs'
 import Badge from '../../../components/ui/Badge'
@@ -12,6 +13,7 @@ import { Spinner } from '../../../components/ui/Loader'
 import { formatDate } from '../../../utils/formatters'
 import EmployeeForm from './EmployeeForm'
 import MakeAndAssignAssetModal from './MakeAndAssignAssetModal'
+import EmployeeEquipmentTab from './EmployeeEquipmentTab'
 import { useToast } from '../../../store/ToastContext'
 
 const InfoRow = ({ label, value }) => (
@@ -29,10 +31,13 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
   const queryClient = useQueryClient()
   const { toast } = useToast()
 
-  const { data: assignments, isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['employee-assignments', employee?.id],
-    queryFn: () => employeeApi.getAssignments(employee.id).then(r => r.data.data),
-    enabled: isOpen && !!employee?.id && tab === 'equipment',
+  const { data: activeConsumables } = useQuery({
+    queryKey: ['employee-consumable-assignments', employee?.id],
+    queryFn: () =>
+      consumableApi
+        .getAssignments({ employee_id: employee.id, is_active: true, limit: 100 })
+        .then(r => r.data.data),
+    enabled: isOpen && !!employee?.id,
   })
 
   const { data: history, isLoading: historyLoading } = useQuery({
@@ -97,14 +102,6 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
     { id: 'history', label: 'History' },
   ]
 
-  // Backend returns assigned_at and returned_at (not assigned_date / returned_date)
-  const equipmentColumns = [
-    { key: 'product_name', header: 'Product', render: (v) => v || '—' },
-    { key: 'category_name', header: 'Category', render: (v) => v || '—' },
-    { key: 'serial_number', header: 'Serial No', render: (v) => v ? <span className="font-mono text-xs">{v}</span> : '—' },
-    { key: 'assigned_at', header: 'Assigned', render: (v) => formatDate(v) },
-  ]
-
   const historyColumns = [
     { key: 'product_name', header: 'Product', render: (v) => v || '—' },
     { key: 'category_name', header: 'Category', render: (v) => v || '—' },
@@ -119,7 +116,10 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
     },
   ]
 
-  const hasActiveAssignments = parseInt(employee.assigned_count || 0, 10) > 0
+  const assetAssignedCount = parseInt(employee.assigned_count || 0, 10)
+  const returnableConsumableCount = (activeConsumables || []).filter(a => a.is_returnable).length
+  const totalActiveCount = assetAssignedCount + returnableConsumableCount
+  const hasActiveAssignments = totalActiveCount > 0
 
   return (
     <>
@@ -152,7 +152,7 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
                   variant="secondary"
                   size="sm"
                   disabled={hasActiveAssignments}
-                  title={hasActiveAssignments ? `Return ${employee.assigned_count} asset(s) before archiving` : 'Archive employee'}
+                  title={hasActiveAssignments ? `Return ${totalActiveCount} item(s) before archiving` : 'Archive employee'}
                   loading={archiveMutation.isPending}
                   onClick={() => archiveMutation.mutate()}
                 >
@@ -185,7 +185,7 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
               <h3 className="text-base font-semibold text-slate-800">{employee.name}</h3>
               {hasActiveAssignments && (
                 <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium ring-1 ring-blue-200">
-                  {employee.assigned_count} assigned
+                  {totalActiveCount} assigned
                 </span>
               )}
             </div>
@@ -221,17 +221,7 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
 
         {/* Equipment tab */}
         {tab === 'equipment' && (
-          <div>
-            {assignmentsLoading ? (
-              <div className="flex justify-center py-8"><Spinner /></div>
-            ) : (
-              <DataTable
-                columns={equipmentColumns}
-                data={assignments || []}
-                emptyMessage="No equipment currently assigned"
-              />
-            )}
-          </div>
+          <EmployeeEquipmentTab employee={employee} />
         )}
 
         {/* History tab */}
@@ -295,7 +285,7 @@ const EmployeeDetailDrawer = ({ employee, isOpen, onClose, onUpdate }) => {
         title={`Delete "${employee.name}"?`}
         message={
           hasActiveAssignments
-            ? `⚠️ ${employee.name} has ${employee.assigned_count} asset(s) currently assigned. Please return all assets before deleting.`
+            ? `⚠️ ${employee.name} has ${totalActiveCount} item(s) currently assigned (${assetAssignedCount} asset(s)${returnableConsumableCount > 0 ? `, ${returnableConsumableCount} returnable bulk inventory issuance(s)` : ''}). Please return all items before deleting.`
             : `This will permanently delete ${employee.name} and all their assignment history. This action cannot be undone.`
         }
         confirmLabel="Delete Permanently"
